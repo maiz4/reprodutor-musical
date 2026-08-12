@@ -1,0 +1,405 @@
+<!DOCTYPE html>
+<html lang="pt-BR" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+    <link rel="alternate icon" type="image/x-icon" href="/favicon.ico">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Meu Perfil - Lynotes</title>
+    <!-- Fonte Plus Jakarta Sans -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+    <link href="/css/index.css" rel="stylesheet">
+    <link href="/css/player.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://unpkg.com/htmx.org@1.9.11"></script>
+</head>
+<body hx-boost="true" hx-select="#app-content" hx-target="#app-content" class="library-bg text-white">
+<div id="app-content">
+
+    <div th:insert="~{fragments/navbar :: navbar('perfil')}"></div>
+
+    <main class="spotify-main container py-5">
+        
+        <!-- Header Hero de Perfil (Vivid Nocturne) -->
+        <div class="music-card-cyber p-4 p-md-5 mb-4">
+            <div class="d-flex align-items-center gap-4 flex-wrap flex-md-nowrap">
+                <!-- Avatar Circular com Borda Roxa Iluminada -->
+                <div class="position-relative" style="width: 120px; height: 120px; min-width: 120px;">
+                    <img th:if="${fotoUrl != null and !fotoUrl.isEmpty()}" 
+                         th:src="${fotoUrl}" 
+                         class="w-100 h-100 rounded-circle object-fit-cover shadow border border-purple border-3"
+                         id="avatar-img-hero"
+                         onerror="this.style.display='none'; document.getElementById('avatar-fallback-hero').style.display='flex';">
+                    <div id="avatar-fallback-hero" 
+                         th:style="${fotoUrl != null and !fotoUrl.isEmpty()} ? 'display: none;' : 'display: flex;'"
+                         class="w-100 h-100 rounded-circle bg-darker border border-purple border-3 align-items-center justify-content-center text-purple fw-bold fs-1 shadow">
+                        <span th:text="${#strings.substring(nome, 0, 1).toUpperCase()}">U</span>
+                    </div>
+                </div>
+
+                <!-- Detalhes do Usuário -->
+                <div class="flex-grow-1">
+                    <div class="d-flex align-items-center gap-2 mb-1">
+                        <h2 class="glowing-title-library mb-0 fs-2" th:text="${nome}">Nome do Usuário</h2>
+                        <span class="badge bg-purple rounded-pill px-3 py-1">Perfil Público</span>
+                    </div>
+                    <p class="text-purple font-monospace mb-1">@<span th:text="${username}">username</span></p>
+                    <p class="text-secondary small mb-2"><i class="bi bi-envelope me-1"></i> <span th:text="${email}">email@email.com</span></p>
+
+                    <!-- Seguidores e Seguindo (estilo discreto e interativo) -->
+                    <div class="d-flex align-items-center gap-2 mb-3" style="font-size: 0.9rem;">
+                        <button type="button" class="btn btn-link text-secondary p-0 text-decoration-none d-flex align-items-center gap-1 shadow-none social-hover-purple" data-bs-toggle="modal" data-bs-target="#seguidoresModal">
+                            <strong class="text-white transition-all" th:text="${seguidores != null ? seguidores.size() : 0}">0</strong>
+                            <span class="transition-all ms-1">seguidores</span>
+                        </button>
+                        <span class="text-secondary opacity-30">•</span>
+                        <button type="button" class="btn btn-link text-secondary p-0 text-decoration-none d-flex align-items-center gap-1 shadow-none social-hover-purple" data-bs-toggle="modal" data-bs-target="#seguindoModal">
+                            <strong class="text-white transition-all" th:text="${seguindo != null ? seguindo.size() : 0}">0</strong>
+                            <span class="transition-all ms-1">seguindo</span>
+                        </button>
+                    </div>
+
+                    <p class="text-secondary mb-3" th:text="${bio != null and !bio.isBlank() ? bio : 'Nenhuma biografia informada ainda.'}"></p>
+
+                    <!-- Pílulas de Estatísticas do Usuário -->
+                    <div class="d-flex gap-2 flex-wrap align-items-center">
+                        <span class="badge bg-darker border border-secondary border-opacity-20 px-3 py-2 text-white font-monospace">
+                            <i class="bi bi-music-note text-purple me-1"></i> <strong th:text="${minhasMusicas != null ? minhasMusicas.size() : 0}">0</strong> Músicas
+                        </span>
+                        <span class="badge bg-darker border border-secondary border-opacity-20 px-3 py-2 text-white font-monospace">
+                            <i class="bi bi-mic text-purple me-1"></i> <strong th:text="${meusArtistas != null ? meusArtistas.size() : 0}">0</strong> Artistas
+                        </span>
+                        <span class="badge bg-darker border border-secondary border-opacity-20 px-3 py-2 text-white font-monospace">
+                            <i class="bi bi-disc text-purple me-1"></i> <strong th:text="${meusAlbums != null ? meusAlbums.size() : 0}">0</strong> Álbuns
+                        </span>
+                        <span class="badge bg-darker border border-secondary border-opacity-20 px-3 py-2 text-white font-monospace">
+                            <i class="bi bi-collection-play text-purple me-1"></i> <strong th:text="${minhasPlaylists != null ? minhasPlaylists.size() : 0}">0</strong> Playlists
+                        </span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Alertas de Sucesso/Erro -->
+        <div class="alert alert-dark border-purple text-purple d-flex align-items-center gap-2 rounded-4 mb-4" th:if="${sucesso}">
+            <i class="bi bi-check-circle-fill fs-5"></i> Perfil atualizado com sucesso!
+        </div>
+        <div class="alert alert-danger rounded-4 mb-4" th:if="${erro}" th:text="${erro}"></div>
+
+        <!-- Abas de Navegação (Meu Acervo / Minhas Publicações / Editar Perfil) -->
+        <ul class="nav nav-pills mb-4 gap-2" id="perfilTabs" role="tablist">
+            <li class="nav-item" role="presentation">
+                <button class="nav-link active px-4 py-2 rounded-pill fw-bold" id="acervo-tab" data-bs-toggle="tab" data-bs-target="#acervo-pane" type="button" role="tab">
+                    <i class="bi bi-person-badge-fill me-2"></i> Visualizar Perfil & Resenhas
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link px-4 py-2 rounded-pill fw-bold" id="posts-tab" data-bs-toggle="tab" data-bs-target="#posts-pane" type="button" role="tab">
+                    <i class="bi bi-chat-square-text-fill me-2"></i> Minhas Publicações
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link px-4 py-2 rounded-pill fw-bold" id="editar-tab" data-bs-toggle="tab" data-bs-target="#editar-pane" type="button" role="tab">
+                    <i class="bi bi-gear-fill me-2"></i> Editar Perfil
+                </button>
+            </li>
+        </ul>
+
+        <div class="tab-content" id="perfilTabsContent">
+            
+            <!-- ABA 1: MEU ACERVO E RESENHAS -->
+            <div class="tab-pane fade show active" id="acervo-pane" role="tabpanel">
+                <div class="mb-5">
+                    <h4 class="text-white fw-bold mb-4 d-flex align-items-center gap-2">
+                        <i class="bi bi-star-fill text-purple"></i> Suas Avaliações & Resenhas Catalogadas
+                    </h4>
+
+                    <div class="alert alert-dark border-purple text-secondary text-center p-4 rounded-4" th:if="${minhasMusicas == null or minhasMusicas.isEmpty()}">
+                        Você ainda não possui músicas catalogadas no seu perfil.
+                    </div>
+
+                    <div class="row row-cols-1 row-cols-md-2 g-4" th:unless="${minhasMusicas == null or minhasMusicas.isEmpty()}">
+                        <div class="col" th:each="musica : ${minhasMusicas}">
+                            <div class="music-card-cyber p-4 h-100 d-flex flex-column justify-content-between">
+                                <div>
+                                    <div class="d-flex align-items-center gap-3 mb-3">
+                                        <img th:if="${musica.capaUrl != null and !musica.capaUrl.isBlank()}" th:src="${musica.capaUrl}" class="rounded-3 shadow" style="width: 60px; height: 60px; object-fit: cover;">
+                                        <div th:unless="${musica.capaUrl != null and !musica.capaUrl.isBlank()}" class="rounded-3 shadow d-flex align-items-center justify-content-center bg-dark text-secondary" style="width: 60px; height: 60px;">
+                                            <i class="bi bi-music-note fs-3"></i>
+                                        </div>
+                                        <div class="overflow-hidden">
+                                            <h6 class="fw-bold text-white mb-0 text-truncate" th:text="${musica.titulo}"></h6>
+                                            <p class="text-secondary small mb-0 text-truncate" th:text="${musica.artista}"></p>
+                                        </div>
+                                    </div>
+                                    <p class="text-light small fst-italic mb-3" style="background: rgba(0,0,0,0.2); padding: 10px; border-radius: 8px;" th:if="${musica.resenha != null and !musica.resenha.isBlank()}" th:text="${'« ' + musica.resenha + ' »'}"></p>
+                                </div>
+
+                                <div class="d-flex align-items-center justify-content-between pt-2 border-top border-secondary border-opacity-10">
+                                    <button type="button" 
+                                            class="btn btn-outline-purple btn-sm rounded-pill px-3" 
+                                            th:data-url="${musica.youtubeUrl}"
+                                            th:data-titulo="${musica.titulo}"
+                                            th:data-artista="${musica.artista}"
+                                            th:data-capa="${musica.capaUrl}"
+                                            th:data-ytid="${musica.youtubeId}"
+                                            onclick="if(typeof playerTocar === 'function') playerTocar(this.getAttribute('data-url'), this.getAttribute('data-titulo'), this.getAttribute('data-artista'), this.getAttribute('data-capa'), this.getAttribute('data-ytid'));">
+                                        <i class="bi bi-play-fill me-1"></i> Ouvir
+                                    </button>
+
+                                    <div th:if="${musica.nota != null}" class="score-badge-circle">
+                                        <span th:text="${musica.nota != null ? musica.nota + ' ★' : ''}">5 ★</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ABA 2: MINHAS PUBLICAÇÕES -->
+            <div class="tab-pane fade" id="posts-pane" role="tabpanel">
+                <div class="mb-5">
+                    <h4 class="text-white fw-bold mb-4 d-flex align-items-center gap-2">
+                        <i class="bi bi-chat-square-text-fill text-purple"></i> Suas Publicações na Comunidade
+                    </h4>
+
+                    <div class="alert alert-dark border-purple text-secondary text-center p-4 rounded-4" th:if="${meusPosts == null or meusPosts.isEmpty()}">
+                        Você ainda não fez nenhuma publicação ou postagem.
+                    </div>
+
+                    <div class="music-card-cyber p-4 mb-3" th:each="post : ${meusPosts}" th:unless="${meusPosts == null or meusPosts.isEmpty()}">
+                        <div class="d-flex justify-content-between align-items-center mb-3">
+                            <div class="d-flex align-items-center">
+                                <div class="rounded-circle bg-purple text-white fw-bold d-flex align-items-center justify-content-center me-3 shadow" style="width: 44px; height: 44px;" th:text="${#strings.substring(post.usuarioNome, 0, 1).toUpperCase()}">U</div>
+                                <div>
+                                    <span class="fw-bold text-white fs-5" th:text="${post.usuarioNome}"></span>
+                                    <div class="text-secondary small" th:text="${#temporals.format(post.dataCriacao, 'dd/MM/yyyy HH:mm')}"></div>
+                                </div>
+                            </div>
+                            <div class="d-flex gap-1">
+                                <form th:action="@{'/comunidade/post/' + ${post.id} + '/excluir'}" method="post" onsubmit="return confirmarExclusaoCustom(this, 'Excluir Post?', 'Tem certeza que deseja excluir esta publicação?');">
+                                    <button type="submit" class="btn btn-outline-danger btn-sm border-0" title="Excluir">
+                                        <i class="bi bi-trash"></i>
+                                    </button>
+                                </form>
+                            </div>
+                        </div>
+
+                        <p class="card-text text-break mb-3 text-light" style="white-space: pre-wrap; font-size: 1.05rem;" th:text="${post.conteudo}"></p>
+
+                        <!-- Interações (Estrelar) -->
+                        <div class="d-flex align-items-center gap-3 pt-3 border-top border-secondary border-opacity-10">
+                            <form th:action="@{'/comunidade/post/' + ${post.id} + '/estrela'}" method="post" class="m-0">
+                                <button type="submit" class="btn btn-sm rounded-pill px-3 d-flex align-items-center gap-1 btn-outline-purple" th:classappend="${post.estreladoPorMim} ? 'bg-purple text-white fw-bold' : ''">
+                                    <i class="bi" th:classappend="${post.estreladoPorMim} ? 'bi-hand-thumbs-up-fill' : 'bi-hand-thumbs-up'"></i>
+                                    <span th:text="${post.qtdEstrelas}"></span>
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ABA 3: EDITAR PERFIL -->
+            <div class="tab-pane fade" id="editar-pane" role="tabpanel">
+                <div class="music-card-cyber p-4 p-md-5">
+                    <h4 class="text-white fw-bold mb-4">Atualizar Dados do Perfil</h4>
+
+                    <form method="post" action="/usuarios/me">
+                        <!-- URL da Foto -->
+                        <div class="mb-4">
+                            <label class="form-label text-purple font-monospace small uppercase fw-bold" for="fotoUrl">URL da Foto de Perfil</label>
+                            <input class="form-control glass-search-input bg-dark border-secondary p-3 text-white"
+                                   id="fotoUrl"
+                                   name="fotoUrl"
+                                   type="url"
+                                   th:value="${fotoUrl}"
+                                   placeholder="https://exemplo.com/sua-foto.jpg">
+                        </div>
+
+                        <!-- Nome -->
+                        <div class="mb-4">
+                            <label class="form-label text-purple font-monospace small uppercase fw-bold" for="nome">Nome Completo</label>
+                            <input class="form-control glass-search-input bg-dark border-secondary p-3 text-white"
+                                   id="nome"
+                                   name="nome"
+                                   maxlength="100"
+                                   th:value="${nome}"
+                                   required>
+                        </div>
+
+                        <!-- Username com Live Check -->
+                        <div class="mb-4">
+                            <label class="form-label text-purple font-monospace small uppercase fw-bold" for="username">Username (@)</label>
+                            <div class="input-group">
+                                <span class="input-group-text bg-dark border-secondary text-purple font-monospace">@</span>
+                                <input class="form-control glass-search-input bg-dark border-secondary p-3 text-white"
+                                       id="username"
+                                       name="username"
+                                       maxlength="100"
+                                       th:value="${username}"
+                                       hx-get="/usuarios/me/check-username"
+                                       hx-trigger="keyup changed delay:400ms"
+                                       hx-target="#username-feedback"
+                                       required>
+                            </div>
+                            <div id="username-feedback" class="mt-1"></div>
+                        </div>
+
+                        <!-- E-mail -->
+                        <div class="mb-4">
+                            <label class="form-label text-purple font-monospace small uppercase fw-bold" for="email">E-mail</label>
+                            <input class="form-control glass-search-input bg-dark border-secondary p-3 text-white"
+                                   id="email"
+                                   name="email"
+                                   type="email"
+                                   maxlength="100"
+                                   th:value="${email}"
+                                   required>
+                        </div>
+
+                        <!-- Bio -->
+                        <div class="mb-4">
+                            <label class="form-label text-purple font-monospace small uppercase fw-bold" for="bio">Sobre mim (Biografia)</label>
+                            <textarea class="form-control glass-search-input bg-dark border-secondary p-3 text-white" id="bio" name="bio" rows="3" maxlength="500" placeholder="Conte um pouco sobre suas preferências musicais..." th:text="${bio}"></textarea>
+                        </div>
+
+                        <!-- Nova Senha -->
+                        <div class="mb-5">
+                            <label class="form-label text-purple font-monospace small uppercase fw-bold" for="senha">Nova Senha (Opcional)</label>
+                            <input class="form-control glass-search-input bg-dark border-secondary p-3 text-white"
+                                   id="senha"
+                                   name="senha"
+                                   type="password"
+                                   placeholder="Deixe em branco se não quiser alterar">
+                        </div>
+
+                        <div class="d-flex justify-content-between align-items-center">
+                            <button class="btn-add-music-glow px-4" type="submit">
+                                <i class="bi bi-save me-1"></i> Salvar Alterações
+                            </button>
+                            <a class="btn btn-outline-secondary rounded-pill px-4" href="/">Cancelar</a>
+                        </div>
+                    </form>
+                </div>
+
+                <!-- Zona de Perigo -->
+                <div class="music-card-cyber border border-danger border-opacity-50 p-4 mt-5">
+                    <h5 class="fw-bold text-danger mb-2"><i class="bi bi-exclamation-triangle-fill me-2"></i> Excluir Conta</h5>
+                    <p class="text-secondary small mb-3">Sua conta e todas as resenhas salvas serão apagadas permanentemente.</p>
+                    <form method="post" action="/usuarios/me/excluir" hx-boost="false" onsubmit="return confirmarExclusaoCustom(this, 'Excluir Conta?', 'Tem certeza absoluta que deseja excluir a sua conta? Esta ação é definitiva e irreversível.');">
+                        <button class="btn btn-outline-danger btn-sm rounded-pill px-4 fw-bold" type="submit">
+                            Excluir Minha Conta
+                        </button>
+                    </form>
+                </div>
+            </div>
+
+        </div>
+
+    </main>
+
+    <!-- Modal Seguidores -->
+    <div class="modal fade" id="seguidoresModal" tabindex="-1" aria-labelledby="seguidoresModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content bg-darker border-secondary text-white rounded-4 shadow">
+                <div class="modal-header border-secondary">
+                    <h5 class="modal-title fw-bold" id="seguidoresModalLabel">
+                        <i class="bi bi-people-fill text-purple me-2"></i>Seguidores
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body" style="max-height: 400px; overflow-y: auto;">
+                    <div th:if="${seguidores == null or seguidores.isEmpty()}" class="text-center py-4 text-secondary">
+                        <i class="bi bi-emoji-smile fs-1 mb-2 d-block"></i>
+                        Nenhum seguidor ainda.
+                    </div>
+                    <div class="d-flex flex-column gap-3" th:unless="${seguidores == null or seguidores.isEmpty()}">
+                        <div class="d-flex align-items-center justify-content-between p-2 rounded bg-dark bg-opacity-50" th:each="user : ${seguidores}">
+                            <div class="d-flex align-items-center gap-3">
+                                <img th:if="${user.fotoUrl != null and !user.fotoUrl.isEmpty()}" th:src="${user.fotoUrl}" class="rounded-circle object-fit-cover shadow border border-purple" style="width: 40px; height: 40px;">
+                                <div th:unless="${user.fotoUrl != null and !user.fotoUrl.isEmpty()}" class="rounded-circle bg-darker text-purple border border-purple d-flex align-items-center justify-content-center fw-bold" style="width: 40px; height: 40px;" th:text="${#strings.substring(user.nome, 0, 1).toUpperCase()}">U</div>
+                                <div>
+                                    <h6 class="fw-bold mb-0 text-white" th:text="${user.nome}"></h6>
+                                    <span class="text-secondary small">@<span th:text="${user.username}">username</span></span>
+                                </div>
+                            </div>
+                            <a th:href="@{'/usuarios/' + ${user.id}}" class="btn btn-outline-purple btn-sm rounded-pill px-3" data-bs-dismiss="modal">Ver Perfil</a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Seguindo -->
+    <div class="modal fade" id="seguindoModal" tabindex="-1" aria-labelledby="seguindoModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content bg-darker border-secondary text-white rounded-4 shadow">
+                <div class="modal-header border-secondary">
+                    <h5 class="modal-title fw-bold" id="seguindoModalLabel">
+                        <i class="bi bi-person-check-fill text-purple me-2"></i>Seguindo
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body" style="max-height: 400px; overflow-y: auto;">
+                    <div th:if="${seguindo == null or seguindo.isEmpty()}" class="text-center py-4 text-secondary">
+                        <i class="bi bi-emoji-neutral fs-1 mb-2 d-block"></i>
+                        Você não está seguindo ninguém ainda.
+                    </div>
+                    <div class="d-flex flex-column gap-3" th:unless="${seguindo == null or seguindo.isEmpty()}">
+                        <div class="d-flex align-items-center justify-content-between p-2 rounded bg-dark bg-opacity-50" th:each="user : ${seguindo}">
+                            <div class="d-flex align-items-center gap-3">
+                                <img th:if="${user.fotoUrl != null and !user.fotoUrl.isEmpty()}" th:src="${user.fotoUrl}" class="rounded-circle object-fit-cover shadow border border-purple" style="width: 40px; height: 40px;">
+                                <div th:unless="${user.fotoUrl != null and !user.fotoUrl.isEmpty()}" class="rounded-circle bg-darker text-purple border border-purple d-flex align-items-center justify-content-center fw-bold" style="width: 40px; height: 40px;" th:text="${#strings.substring(user.nome, 0, 1).toUpperCase()}">U</div>
+                                <div>
+                                    <h6 class="fw-bold mb-0 text-white" th:text="${user.nome}"></h6>
+                                    <span class="text-secondary small">@<span th:text="${user.username}">username</span></span>
+                                </div>
+                            </div>
+                            <a th:href="@{'/usuarios/' + ${user.id}}" class="btn btn-outline-purple btn-sm rounded-pill px-3" data-bs-dismiss="modal">Ver Perfil</a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        (function() {
+            function restoreProfileTab() {
+                const activeTabId = sessionStorage.getItem('activeProfileTab');
+                if (activeTabId) {
+                    const tabEl = document.getElementById(activeTabId);
+                    if (tabEl) {
+                        tabEl.click();
+                    }
+                }
+
+                const tabButtons = document.querySelectorAll('#perfilTabs button[data-bs-toggle="tab"]');
+                tabButtons.forEach(btn => {
+                    btn.addEventListener('shown.bs.tab', function(e) {
+                        sessionStorage.setItem('activeProfileTab', e.target.id);
+                    });
+                });
+            }
+
+            restoreProfileTab();
+
+            document.body.addEventListener('htmx:afterSwap', function(event) {
+                if (document.getElementById('perfilTabs')) {
+                    restoreProfileTab();
+                }
+            });
+        })();
+    </script>
+</div>
+
+<div th:insert="~{fragments/player :: bottom-player}"></div>
+</body>
+</html>

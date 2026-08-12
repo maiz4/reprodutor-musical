@@ -1,0 +1,34 @@
+# Maven target directory
+target/
+
+# IDE files
+.idea/
+*.iml
+out/
+.vscode/
+.settings/
+.project
+.classpath
+.factorypath
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Environment and logs
+.env
+logs/
+*.log
+
+# Scratch and temporary files
+yt_old.java
+ladygaga.html
+Test.java
+Test.class
+FixLayout.java
+player_old.html
+stitch_ui_files/
+.agents/
+ROTEIRO_APRESENTACAO.md
+*roteiro*.md
+

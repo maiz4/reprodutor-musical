@@ -1,0 +1,536 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+</head>
+<body>
+    <div th:fragment="navbar(paginaAtiva)">
+        <!-- Spotify-style Sidebar -->
+        <nav class="spotify-sidebar d-flex flex-column">
+            <div class="d-flex align-items-center justify-content-between mb-4 mt-2 px-1">
+                <a href="/" class="d-flex align-items-center px-4 text-decoration-none" title="Ir para Meu Catálogo">
+                    <i class="bi bi-music-note-beamed text-purple fs-4 me-3"></i>
+                    <span class="fw-bold text-purple fs-3 sidebar-text" style="letter-spacing: -0.5px;">Lynotes</span>
+                </a>
+            </div>
+            
+            <script>
+                function applySidebarState() {
+                    const isCollapsed = localStorage.getItem('sidebarCollapsed') === 'true';
+                    const sidebar = document.querySelector('.spotify-sidebar');
+                    const toggleBtn = document.getElementById('sidebar-toggle-btn');
+                    if (sidebar) {
+                        sidebar.classList.toggle('collapsed', isCollapsed);
+                    }
+                    if (toggleBtn) {
+                        toggleBtn.style.left = isCollapsed ? '80px' : '240px';
+                    }
+                    document.querySelectorAll('.spotify-main').forEach(m => m.classList.toggle('expanded', isCollapsed));
+                }
+                // Apply immediately to prevent flicker
+                applySidebarState();
+                
+                function toggleSidebar() {
+                    const isCollapsed = localStorage.getItem('sidebarCollapsed') === 'true';
+                    localStorage.setItem('sidebarCollapsed', !isCollapsed);
+                    applySidebarState();
+                }
+                
+                // Re-apply when HTMX swaps content (since navbar might be recreated)
+                document.body.addEventListener('htmx:afterSwap', function(evt) {
+                    if (evt.detail.target.id === 'app-content') {
+                        applySidebarState();
+                        // Re-apply player margin state
+                        if (typeof playerState !== 'undefined') {
+                            document.querySelectorAll('.spotify-main').forEach(el => {
+                                el.classList.toggle('player-open', !playerState.collapsed);
+                            });
+                        }
+                        initInteractiveStars();
+                    }
+                });
+
+                function initInteractiveStars() {
+                    document.querySelectorAll('.interactive-stars').forEach(container => {
+                        if (container.dataset.initialized) return;
+                        container.dataset.initialized = 'true';
+                        
+                        const input = document.getElementById(container.dataset.input);
+                        const stars = container.querySelectorAll('.star-btn');
+                        let currentRating = parseFloat(container.dataset.initial) || 0;
+
+                        const render = (rating) => {
+                            stars.forEach((star, idx) => {
+                                let starValue = idx + 1;
+                                if (rating >= starValue) {
+                                    star.className = 'bi bi-star-fill star-btn text-warning';
+                                } else {
+                                    star.className = 'bi bi-star star-btn text-muted';
+                                }
+                            });
+                        };
+
+                        render(currentRating);
+
+                        stars.forEach((star, idx) => {
+                            star.addEventListener('mouseenter', () => {
+                                render(idx + 1);
+                            });
+                            star.addEventListener('click', () => {
+                                currentRating = idx + 1;
+                                if (input) {
+                                    input.value = currentRating;
+                                }
+                                render(currentRating);
+                            });
+                        });
+                        container.addEventListener('mouseleave', () => render(currentRating));
+                    });
+                }
+                
+                document.addEventListener('DOMContentLoaded', initInteractiveStars);
+
+                if (typeof window.toggleOpcoesMenu !== 'function') {
+                    window.toggleOpcoesMenu = function(e, btn) {
+                        if (e) {
+                            e.preventDefault();
+                            e.stopPropagation();
+                        }
+                        const dropdownDiv = btn.closest('.dropdown') || btn.closest('.dropend');
+                        if (!dropdownDiv) return;
+                        const menu = dropdownDiv.querySelector('.dropdown-menu');
+                        if (!menu) return;
+
+                        const isShown = menu.classList.contains('show');
+                        document.querySelectorAll('.dropdown-menu.show').forEach(m => m.classList.remove('show'));
+
+                        if (!isShown) {
+                            menu.classList.add('show');
+                        }
+                    };
+
+                    document.addEventListener('click', function(e) {
+                        if (!e.target.closest('.dropdown') && !e.target.closest('.dropend')) {
+                            document.querySelectorAll('.dropdown-menu.show').forEach(m => m.classList.remove('show'));
+                        }
+                    });
+                }
+
+                if (typeof window.carregarNotificacoes !== 'function') {
+                    window.carregarNotificacoes = function() {
+                        fetch('/api/notificacoes')
+                            .then(r => r.json())
+                            .then(notificacoes => {
+                                const unread = notificacoes.filter(n => !n.lida).length;
+                                
+                                // Atualiza badges
+                                const badges = ['notification-unread-count', 'tab-notification-unread-count'];
+                                badges.forEach(id => {
+                                    const badgeEl = document.getElementById(id);
+                                    if (badgeEl) {
+                                        if (unread > 0) {
+                                            badgeEl.textContent = unread;
+                                            badgeEl.style.display = 'inline-block';
+                                        } else {
+                                            badgeEl.style.display = 'none';
+                                        }
+                                    }
+                                });
+
+                                // Pulsação do sininho
+                                const bellIcon = document.getElementById('notification-bell-icon');
+                                if (bellIcon) {
+                                    if (unread > 0) {
+                                        bellIcon.classList.add('animate-pulse');
+                                    } else {
+                                        bellIcon.classList.remove('animate-pulse');
+                                    }
+                                }
+
+                                // Atualiza a lista na aba da Comunidade
+                                const tabListEl = document.getElementById('tab-notifications-list');
+                                if (tabListEl) {
+                                    if (notificacoes.length === 0) {
+                                        tabListEl.innerHTML = `
+                                            <div class="text-secondary text-center py-5">
+                                                <i class="bi bi-bell-slash fs-1 d-block mb-3 text-secondary opacity-50"></i>
+                                                Nenhuma notificação por enquanto.
+                                            </div>
+                                        `;
+                                        return;
+                                    }
+                                    
+                                    tabListEl.innerHTML = notificacoes.map(n => {
+                                        let actionHtml = '';
+                                        if (n.tipo === 'SEGUIR' && !n.seguindoDeVolta) {
+                                            actionHtml = `
+                                                <button class="btn btn-purple btn-sm rounded-pill px-3 py-1" style="font-size: 0.75rem;" onclick="window.seguirDeVoltaNotif(event, '${n.autorId}', this)">Seguir de volta</button>
+                                            `;
+                                        }
+                                        
+                                        let iconClass = 'bi-bell-fill text-purple';
+                                        if (n.tipo === 'SEGUIR') iconClass = 'bi-person-plus-fill text-info';
+                                        else if (n.tipo === 'CURTIDA') iconClass = 'bi-heart-fill text-danger';
+                                        else if (n.tipo === 'COMENTARIO') iconClass = 'bi-chat-left-text-fill text-success';
+                                        
+                                        return `
+                                            <div class="p-3 rounded-4 bg-dark bg-opacity-40 border border-secondary border-opacity-15 position-relative ${n.lida ? '' : 'border-start-purple'} mb-2 d-flex align-items-center justify-content-between">
+                                                <div class="d-flex align-items-center gap-3">
+                                                    <div class="rounded-circle bg-darker d-flex align-items-center justify-content-center border border-secondary border-opacity-30 shadow" style="width: 40px; height: 40px; min-width: 40px;">
+                                                        <i class="bi ${iconClass}" style="font-size: 1.1rem;"></i>
+                                                    </div>
+                                                    <div class="overflow-hidden">
+                                                        <div class="text-white" style="font-size: 0.95rem;">
+                                                            <strong class="text-purple">${escapeHtml(n.autorNome)}</strong> ${escapeHtml(n.conteudo)}
+                                                        </div>
+                                                        <div class="text-secondary small mt-0.5">${n.tempoAtras}</div>
+                                                    </div>
+                                                </div>
+                                                <div>
+                                                    ${actionHtml}
+                                                </div>
+                                            </div>
+                                        `;
+                                    }).join('');
+                                }
+                            })
+                            .catch(e => console.error('Erro ao buscar notificações:', e));
+                    };
+
+                    window.marcarNotificacoesComoLidas = function(e) {
+                        if (e) {
+                            e.preventDefault();
+                            e.stopPropagation();
+                        }
+                        fetch('/api/notificacoes/ler-todas', { method: 'POST' })
+                            .then(() => window.carregarNotificacoes())
+                            .catch(e => console.error(e));
+                    };
+
+                    window.seguirDeVoltaNotif = function(e, autorId, btn) {
+                        if (e) {
+                            e.preventDefault();
+                            e.stopPropagation();
+                        }
+                        btn.disabled = true;
+                        btn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>';
+                        fetch('/comunidade/seguir/' + autorId, { method: 'POST' })
+                            .then(() => {
+                                btn.className = 'btn btn-outline-secondary btn-sm rounded-pill px-3 py-1 disabled';
+                                btn.textContent = 'Seguindo';
+                                window.carregarNotificacoes();
+                            })
+                            .catch(() => {
+                                btn.disabled = false;
+                                btn.textContent = 'Seguir de volta';
+                            });
+                    };
+
+                    window.handleNavbarNotifClick = function(e) {
+                        const tab = document.getElementById('notificacoes-tab');
+                        if (tab) {
+                            if (e) e.preventDefault();
+                            tab.click();
+                        }
+                    };
+
+                    function escapeHtml(text) {
+                        return (text || '').replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+                    }
+
+                    // Carrega inicialmente e a cada 15 segundos
+                    document.addEventListener('DOMContentLoaded', () => {
+                        window.carregarNotificacoes();
+                        setInterval(window.carregarNotificacoes, 15000);
+                    });
+                    document.body.addEventListener('htmx:afterSwap', () => {
+                        window.carregarNotificacoes();
+                    });
+                }
+            </script>
+            
+            <div class="flex-grow-1">
+                <a class="spotify-sidebar-link" th:classappend="${paginaAtiva == 'catalogo'} ? 'active' : ''" href="/">
+                    <i class="bi bi-house-door-fill fs-5"></i>
+                    <span class="sidebar-text">Meu Catálogo</span>
+                </a>
+                <a class="spotify-sidebar-link" th:classappend="${paginaAtiva == 'musicas'} ? 'active' : ''" href="/musicas">
+                    <i class="bi bi-music-note-list fs-5"></i>
+                    <span class="sidebar-text">Músicas</span>
+                </a>
+                <a class="spotify-sidebar-link" th:classappend="${paginaAtiva == 'artistas'} ? 'active' : ''" href="/artistas">
+                    <i class="bi bi-mic-fill fs-5"></i>
+                    <span class="sidebar-text">Artistas</span>
+                </a>
+                <a class="spotify-sidebar-link" th:classappend="${paginaAtiva == 'albums' or paginaAtiva == 'albuns'} ? 'active' : ''" href="/albuns">
+                    <i class="bi bi-disc-fill fs-5"></i>
+                    <span class="sidebar-text">Álbuns</span>
+                </a>
+                <a class="spotify-sidebar-link" th:classappend="${paginaAtiva == 'comunidade'} ? 'active' : ''" href="/comunidade">
+                    <div class="position-relative">
+                        <i class="bi bi-people-fill fs-5"></i>
+                        <span th:if="${session != null and session.novidadesComunidade}" class="position-absolute top-0 start-100 translate-middle p-1 bg-purple border border-dark rounded-circle">
+                            <span class="visually-hidden">New alerts</span>
+                        </span>
+                    </div>
+                    <span class="sidebar-text">Comunidade</span>
+                </a>
+                
+
+
+                <a class="spotify-sidebar-link" th:classappend="${paginaAtiva == 'perfil'} ? 'active' : ''" th:if="${usuarioLogado != null}" href="/perfil">
+                    <i class="bi bi-person-circle fs-5"></i>
+                    <span class="sidebar-text text-truncate">Meu Perfil</span>
+                </a>
+            </div>
+            
+            <!-- Botão de Sair sozinho embaixo -->
+            <div class="p-3 mt-auto" th:if="${usuarioLogado != null}">
+                <form method="post" action="/logout" hx-boost="false" class="m-0">
+                    <button class="spotify-sidebar-link bg-transparent border-0 w-100 text-start" type="submit">
+                        <i class="bi bi-box-arrow-right fs-5"></i>
+                        <span class="sidebar-text">Sair</span>
+                    </button>
+                </form>
+            </div>
+        </nav>
+        
+        <!-- Nova abinha flutuante para minimizar a barra -->
+        <button class="sidebar-toggle-tab" id="sidebar-toggle-btn" type="button" onclick="toggleSidebar()" title="Ocultar/Mostrar Menu">
+            <span class="sidebar-toggle-icon">&#9664;</span>
+        </button>
+
+        <!-- Custom Cyber Confirmation Modal -->
+        <div class="modal fade" id="customConfirmModal" tabindex="-1" aria-hidden="true" style="z-index: 1065;">
+          <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content bg-darker border-secondary shadow-lg" style="border-radius: 20px; box-shadow: 0 0 30px rgba(138, 43, 226, 0.25);">
+              <div class="modal-header border-bottom border-secondary border-opacity-25 py-3">
+                <h5 class="modal-title text-white fw-bold d-flex align-items-center gap-2" id="customConfirmTitle">
+                  <i class="bi bi-exclamation-triangle text-purple fs-4"></i> Confirmar Ação
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+              </div>
+              <div class="modal-body text-light py-4" id="customConfirmMessage" style="font-size: 1.05rem;">
+                Tem certeza que deseja prosseguir?
+              </div>
+              <div class="modal-footer border-top border-secondary border-opacity-25 py-3" id="customConfirmFooter">
+                <button type="button" class="btn btn-outline-secondary rounded-pill px-4" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-danger rounded-pill px-4 fw-bold" id="customConfirmBtn">Confirmar</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Toast Notifications Container -->
+        <div class="toast-container position-fixed top-0 end-0 p-3" style="z-index: 1080;" id="toastContainer"></div>
+
+        <script>
+            // Global Toast Notification System
+            window.exibirToast = function(mensagem, tipo = 'success') {
+                const container = document.getElementById('toastContainer');
+                if (!container) return;
+                
+                const toast = document.createElement('div');
+                toast.className = `toast align-items-center text-white border-0 shadow-lg show mb-2`;
+                toast.style.background = tipo === 'success' ? 'linear-gradient(135deg, #10b981 0%, #059669 100%)' : 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)';
+                toast.style.borderRadius = '14px';
+                toast.style.backdropFilter = 'blur(10px)';
+                
+                toast.innerHTML = `
+                  <div class="d-flex p-3 align-items-center">
+                    <div class="toast-body fw-bold d-flex align-items-center gap-2">
+                      <i class="bi ${tipo === 'success' ? 'bi-check-circle-fill' : 'bi-exclamation-triangle-fill'} fs-5"></i>
+                      ${mensagem}
+                    </div>
+                    <button type="button" class="btn-close btn-close-white m-auto me-2" data-bs-dismiss="toast" aria-label="Close"></button>
+                  </div>
+                `;
+                
+                container.appendChild(toast);
+                
+                setTimeout(() => {
+                    toast.classList.remove('show');
+                    setTimeout(() => toast.remove(), 300);
+                }, 4000);
+            };
+
+            window.fecharTodosModaisEBackdrops = function() {
+                document.querySelectorAll('.modal').forEach(modalEl => {
+                    try {
+                        const inst = bootstrap.Modal.getInstance(modalEl);
+                        if (inst) inst.hide();
+                    } catch(e) {}
+                    modalEl.classList.remove('show');
+                    modalEl.style.display = 'none';
+                    modalEl.setAttribute('aria-hidden', 'true');
+                    modalEl.removeAttribute('aria-modal');
+                    modalEl.removeAttribute('role');
+                });
+                document.querySelectorAll('.modal-backdrop').forEach(b => b.remove());
+                document.body.classList.remove('modal-open');
+                document.body.style.overflow = '';
+                document.body.style.paddingRight = '';
+            };
+
+            // Custom Alert Modal Helper
+            window.exibirAlertCustom = function(titulo, mensagem) {
+                const modalEl = document.getElementById('customConfirmModal');
+                if (!modalEl) {
+                    alert(mensagem);
+                    return;
+                }
+                
+                if (modalEl.parentNode !== document.body) {
+                    document.body.appendChild(modalEl);
+                }
+                
+                const titleEl = document.getElementById('customConfirmTitle');
+                const msgEl = document.getElementById('customConfirmMessage');
+                const footerEl = document.getElementById('customConfirmFooter');
+                
+                titleEl.innerHTML = `<i class="bi bi-exclamation-triangle text-purple fs-4"></i> ${titulo}`;
+                msgEl.innerHTML = mensagem;
+                
+                footerEl.innerHTML = `
+                    <button type="button" class="btn btn-outline-purple rounded-pill px-4" data-bs-dismiss="modal" onclick="fecharTodosModaisEBackdrops()">Fechar</button>
+                `;
+                
+                const bootstrapModal = bootstrap.Modal.getOrCreateInstance(modalEl);
+                bootstrapModal.show();
+            };
+
+            // Custom Confirmation Modal Helper
+            window.confirmarExclusaoCustom = function(formElement, titulo, mensagem, opacaoApagarCatalogo = false, eventObj = null) {
+                if (formElement.dataset.confirmed === 'true') {
+                    setTimeout(() => {
+                        formElement.dataset.confirmed = 'false';
+                    }, 100);
+                    return true;
+                }
+
+                const ev = eventObj || window.event;
+                if (ev) {
+                    if (typeof ev.preventDefault === 'function') ev.preventDefault();
+                    if (typeof ev.stopImmediatePropagation === 'function') ev.stopImmediatePropagation();
+                    if (typeof ev.stopPropagation === 'function') ev.stopPropagation();
+                }
+
+                const modalEl = document.getElementById('customConfirmModal');
+                if (!modalEl) {
+                    if (confirm(mensagem)) {
+                        formElement.dataset.confirmed = 'true';
+                        formElement.submit();
+                    }
+                    return false;
+                }
+                
+                // Do not append to body to avoid duplicate elements in the DOM across HTMX boosts
+                
+                const titleEl = modalEl.querySelector('#customConfirmTitle') || document.getElementById('customConfirmTitle');
+                const msgEl = modalEl.querySelector('#customConfirmMessage') || document.getElementById('customConfirmMessage');
+                const footerEl = modalEl.querySelector('#customConfirmFooter') || document.getElementById('customConfirmFooter');
+                
+                titleEl.innerHTML = `<i class="bi bi-exclamation-triangle text-purple fs-4"></i> ${titulo}`;
+                msgEl.innerHTML = mensagem;
+                
+                const bootstrapModal = bootstrap.Modal.getOrCreateInstance(modalEl);
+                
+                if (opacaoApagarCatalogo) {
+                    footerEl.innerHTML = `
+                        <button type="button" class="btn btn-outline-secondary rounded-pill px-3" data-bs-dismiss="modal" onclick="fecharTodosModaisEBackdrops()">Cancelar</button>
+                        <button type="button" class="btn btn-outline-purple rounded-pill px-3" id="btnApenasRemover">Apenas remover da playlist</button>
+                        <button type="button" class="btn btn-danger rounded-pill px-3 fw-bold" id="btnApagarTudo">Apagar de Tudo (Catálogo e Playlist)</button>
+                    `;
+                    
+                    const btnApenasRemover = footerEl.querySelector('#btnApenasRemover') || document.getElementById('btnApenasRemover');
+                    if (btnApenasRemover) {
+                        btnApenasRemover.onclick = function() {
+                            formElement.action = formElement.action.split('?')[0] + "?apagarMusica=false";
+                            fecharTodosModaisEBackdrops();
+                            formElement.dataset.confirmed = 'true';
+                            if (typeof formElement.requestSubmit === 'function') {
+                                formElement.requestSubmit();
+                            } else {
+                                formElement.submit();
+                            }
+                        };
+                    }
+                    
+                    const btnApagarTudo = footerEl.querySelector('#btnApagarTudo') || document.getElementById('btnApagarTudo');
+                    if (btnApagarTudo) {
+                        btnApagarTudo.onclick = function() {
+                            formElement.action = formElement.action.split('?')[0] + "?apagarMusica=true";
+                            fecharTodosModaisEBackdrops();
+                            formElement.dataset.confirmed = 'true';
+                            if (typeof formElement.requestSubmit === 'function') {
+                                formElement.requestSubmit();
+                            } else {
+                                formElement.submit();
+                            }
+                        };
+                    }
+                } else {
+                    footerEl.innerHTML = `
+                        <button type="button" class="btn btn-outline-secondary rounded-pill px-4" data-bs-dismiss="modal" onclick="fecharTodosModaisEBackdrops()">Cancelar</button>
+                        <button type="button" class="btn btn-danger rounded-pill px-4 fw-bold" id="customConfirmBtn">Confirmar</button>
+                    `;
+                    
+                    const customConfirmBtn = footerEl.querySelector('#customConfirmBtn') || document.getElementById('customConfirmBtn');
+                    if (customConfirmBtn) {
+                        customConfirmBtn.onclick = function() {
+                            fecharTodosModaisEBackdrops();
+                            formElement.dataset.confirmed = 'true';
+                            if (typeof formElement.requestSubmit === 'function') {
+                                formElement.requestSubmit();
+                            } else {
+                                formElement.submit();
+                            }
+                        };
+                    }
+                }
+                
+                bootstrapModal.show();
+                return false;
+            };
+
+            document.addEventListener('htmx:confirm', function(evt) {
+                const form = evt.target ? evt.target.closest('form') : null;
+                if (form && form.getAttribute('onsubmit') && form.getAttribute('onsubmit').includes('confirmarExclusaoCustom')) {
+                    if (form.dataset.confirmed !== 'true') {
+                        evt.preventDefault();
+                    }
+                }
+            });
+
+            document.addEventListener('htmx:afterSwap', () => window.fecharTodosModaisEBackdrops());
+            document.addEventListener('htmx:beforeSwap', () => window.fecharTodosModaisEBackdrops());
+            window.addEventListener('popstate', () => window.fecharTodosModaisEBackdrops());
+
+            // URL Parameters success/error automatic toast notifications
+            function processarToastsUrl() {
+                window.fecharTodosModaisEBackdrops();
+                const urlParams = new URLSearchParams(window.location.search);
+                if (urlParams.has('sucesso')) {
+                    const msg = urlParams.get('sucesso');
+                    window.exibirToast(msg ? decodeURIComponent(msg) : "Operação realizada com sucesso!", "success");
+                    const newUrl = window.location.pathname;
+                    window.history.replaceState({}, document.title, newUrl);
+                }
+                if (urlParams.has('erro')) {
+                    const msg = urlParams.get('erro');
+                    window.exibirToast(msg ? decodeURIComponent(msg) : "Ocorreu um erro.", "danger");
+                    const newUrl = window.location.pathname;
+                    window.history.replaceState({}, document.title, newUrl);
+                }
+                if (urlParams.has('excluido')) {
+                    window.exibirToast("Conta excluída com sucesso.", "success");
+                    const newUrl = window.location.pathname;
+                    window.history.replaceState({}, document.title, newUrl);
+                }
+            }
+
+            window.addEventListener('DOMContentLoaded', processarToastsUrl);
+            document.addEventListener('htmx:afterSwap', processarToastsUrl);
+        </script>
+    </div>
+</body>
+</html>

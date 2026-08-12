@@ -1,0 +1,366 @@
+<!DOCTYPE html>
+<html lang="pt-BR" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title th:text="${form.edicao ? 'Editar Música - Lynotes' : 'Novo Música - Lynotes'}">Música - Lynotes</title>
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+    <link rel="alternate icon" type="image/x-icon" href="/favicon.ico">
+    <!-- Fonte Plus Jakarta Sans -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+    <link href="/css/index.css" rel="stylesheet">
+    <link href="/css/player.css" rel="stylesheet">
+    <script src="https://unpkg.com/htmx.org@1.9.11"></script>
+</head>
+<body hx-boost="true" hx-select="#app-content" hx-target="#app-content" class="library-bg text-white">
+<div id="app-content">
+    <style>
+        .yt-result-item {
+            transition: all 0.2s ease;
+        }
+        .yt-result-item:hover, .active-item {
+            background-color: rgba(181, 124, 255, 0.15) !important;
+            border-color: #B57CFF !important;
+            transform: translateX(4px);
+        }
+    </style>
+
+    <div th:insert="~{fragments/navbar :: navbar('musicas')}"></div>
+
+    <main class="spotify-main container py-5">
+        <div class="row justify-content-center">
+            <div class="col-lg-8">
+                
+                <!-- Card Cyberpunk do Formulário -->
+                <div class="music-card-cyber p-4 p-md-5">
+                    <div class="mb-4">
+                        <h2 class="glowing-title-library mb-1" th:text="${form.edicao ? 'Editar Música' : 'Novo Música'}">Novo Música</h2>
+                        <p class="text-secondary mb-0">Cadastre ou edite as informações de uma música no seu acervo.</p>
+                    </div>
+
+                    <div class="alert alert-danger rounded-4 mb-4" th:if="${erro}" th:text="${erro}"></div>
+
+                    <!-- BUSCA DINÂMICA DE MÚSICAS E ARTISTAS (Apenas no cadastro) -->
+                    <div th:unless="${form.edicao}" class="mb-5 p-4 rounded-4 bg-darker border border-secondary border-opacity-30 position-relative shadow-sm">
+                        <div class="d-flex align-items-center gap-2 mb-2">
+                            <i class="bi bi-music-note-beamed text-purple fs-4"></i>
+                            <h4 class="fw-bold text-white mb-0">Buscar Música</h4>
+                        </div>
+                        <p class="text-secondary small mb-3">Pesquise pelo <strong>nome da música</strong> ou pelo <strong>nome do artista</strong> (ex: Bohemian Rhapsody, Queen) para carregar os dados da música.</p>
+                        
+                        <div class="position-relative">
+                            <input type="text"
+                                   id="ytQuery"
+                                   class="form-control glass-search-input bg-dark text-white border-secondary p-3 pe-5"
+                                   placeholder="Digite o nome da música ou artista..."
+                                   autocomplete="off"
+                                   autocorrect="off"
+                                   autocapitalize="off"
+                                   spellcheck="false"
+                                   oninput="window.debounceSearchYT('MUSICA')"
+                                   onkeydown="window.handleKeyNav(event, 'MUSICA')">
+                            <div id="ytSpinner" class="spinner-border spinner-border-sm text-purple position-absolute end-0 top-50 translate-middle-y me-3 d-none"></div>
+                        </div>
+
+                        <!-- Lista de Resultados -->
+                        <div id="ytResults" class="d-flex flex-column gap-2 mt-3 overflow-auto" style="max-height: 280px;"></div>
+
+                        <!-- Card de Pré-visualização da Música Selecionada -->
+                        <div id="mediaPreview" class="d-none mt-4 p-3 rounded-4 bg-dark border border-purple border-opacity-40 shadow">
+                            <div class="d-flex align-items-center gap-3">
+                                <img id="previewCapa" src="/public/img/default-cover.png" class="rounded-3 shadow" style="width: 80px; height: 80px; min-width: 80px; object-fit: cover;">
+                                <div class="overflow-hidden">
+                                    <div class="badge bg-purple rounded-pill px-2.5 py-1 mb-1 small fw-bold">Música Selecionada</div>
+                                    <h5 id="previewTitulo" class="fw-bold text-white mb-0 text-truncate">Título</h5>
+                                    <p id="previewArtista" class="text-secondary small mb-0 text-truncate">Artista</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <form method="post" th:action="${form.acao}" id="formMusica" onsubmit="return handleFormMusicaSubmit(event, this);">
+                        
+                        <!-- Card de Pré-visualização da Música (Apenas na Edição) -->
+                        <div th:if="${form.edicao}" class="mb-4 p-3 rounded-4 bg-darker border border-purple border-opacity-40 shadow d-flex align-items-center gap-3">
+                            <img th:src="${form.capaUrl != null and !form.capaUrl.isBlank() ? form.capaUrl : '/public/img/default-cover.png'}" class="rounded-3 shadow" style="width: 80px; height: 80px; min-width: 80px; object-fit: cover;">
+                            <div class="overflow-hidden">
+                                <div class="badge bg-purple rounded-pill px-2.5 py-1 mb-1 small fw-bold">Música</div>
+                                <h5 class="fw-bold text-white mb-0 text-truncate" th:text="${form.titulo}">Título</h5>
+                                <p class="text-secondary small mb-0 text-truncate" th:text="${form.artista}">Artista</p>
+                            </div>
+                        </div>
+
+                        <!-- CAMPOS OCULTOS -->
+                        <input type="hidden" id="titulo" name="titulo" th:value="${form.titulo}">
+                        <input type="hidden" id="artista" name="artista" th:value="${form.artista}">
+                        <input type="hidden" id="capaUrl" name="capaUrl" th:value="${form.capaUrl}">
+                        <input type="hidden" id="duracaoSegundos" name="duracaoSegundos" th:value="${form.duracaoSegundos}">
+                        <input type="hidden" id="youtubeUrl" name="youtubeUrl" th:value="${form.youtubeUrl}">
+                        <input type="hidden" id="youtubeId" name="youtubeId" th:value="${form.youtubeId}">
+                        <input type="hidden" id="novaPlaylistNome" name="novaPlaylistNome" th:value="${form.novaPlaylistNome}">
+
+                        <!-- OPINIÃO E RESENHA -->
+                        <div class="mb-4 p-4 rounded-4 bg-darker border border-secondary border-opacity-20">
+                            <h5 class="fw-bold text-purple mb-3"><i class="bi bi-chat-left-quote me-2"></i> Sua Opinião &amp; Avaliação</h5>
+                            
+                            <!-- 1. NOTA (Estrelas) -->
+                            <div class="mb-4">
+                                <label class="form-label d-block text-white fw-bold">Sua nota (1 a 5 estrelas)</label>
+                                <div class="interactive-stars fs-2" data-input="nota-input" th:attr="data-initial=${form.nota}" style="cursor: pointer;">
+                                    <i class="bi bi-star star-btn text-warning" data-index="1"></i>
+                                    <i class="bi bi-star star-btn text-warning" data-index="2"></i>
+                                    <i class="bi bi-star star-btn text-warning" data-index="3"></i>
+                                    <i class="bi bi-star star-btn text-warning" data-index="4"></i>
+                                    <i class="bi bi-star star-btn text-warning" data-index="5"></i>
+                                </div>
+                                <input type="hidden" name="nota" id="nota-input" th:value="${form.nota}">
+                            </div>
+
+                            <!-- 2. RESENHA / ANOTAÇÕES -->
+                            <div class="mb-4">
+                                <label class="form-label text-purple font-monospace small uppercase fw-bold" for="resenha">Comentário / Resenha</label>
+                                <textarea class="form-control glass-search-input bg-dark text-white border-secondary p-3"
+                                          id="resenha"
+                                          name="resenha"
+                                          rows="3"
+                                          th:text="${form.resenha}"
+                                          placeholder="O que você achou desta música? Deixe sua análise detalhada..."></textarea>
+                            </div>
+
+                            <!-- 3. COMPARTILHAR COM A COMUNIDADE (Abaixo da resenha) -->
+                            <div class="p-3 rounded-4 bg-dark border border-secondary border-opacity-20">
+                                <div class="d-flex align-items-center justify-content-between">
+                                    <label class="form-check-label fw-bold text-white mb-0" for="compartilharNaComunidade" style="cursor: pointer;">
+                                        Compartilhar com a Comunidade
+                                    </label>
+                                    <div class="form-check form-switch p-0 m-0">
+                                        <input class="custom-toggle-switch" type="checkbox" id="compartilharNaComunidade" name="compartilharNaComunidade">
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- PLAYLIST OPCIONAL -->
+                        <div class="mb-4">
+                            <label class="form-label text-purple font-monospace small uppercase fw-bold" for="playlistId">Salvar em</label>
+                            <select class="form-select glass-search-input bg-dark text-white border-secondary p-3" id="playlistId" name="playlistId">
+                                <option value="">Nenhuma playlist selecionada</option>
+                                <option th:each="pl : ${form.playlists}" th:value="${pl.id}" th:text="${pl.nome}" th:selected="${form.playlistId == pl.id}"></option>
+                            </select>
+                        </div>
+
+                        <div class="d-flex justify-content-between align-items-center pt-3 border-top border-secondary border-opacity-10">
+                            <a class="btn btn-outline-secondary rounded-pill px-4" href="/musicas">Cancelar</a>
+                            <button class="btn-add-music-glow px-4" type="submit">
+                                <i class="bi bi-check-circle-fill me-1"></i>
+                                <span th:text="${form.edicao ? 'Salvar Alterações' : 'Cadastrar Música'}">Cadastrar</span>
+                            </button>
+                        </div>
+                    </form>
+                </div>
+
+            </div>
+        </div>
+
+        <script>
+            (function() {
+                let searchTimer = null;
+                let itemsList = [];
+                let activeIndex = -1;
+
+                window.debounceSearchYT = function(tipo) {
+                    clearTimeout(searchTimer);
+                    searchTimer = setTimeout(() => window.buscarYT(tipo), 250);
+                };
+
+                window.handleKeyNav = function(e, tipo) {
+                    const resultsDiv = document.getElementById('ytResults');
+                    if (!resultsDiv || itemsList.length === 0) {
+                        if (e.key === 'Enter') {
+                            e.preventDefault();
+                            window.buscarYT(tipo);
+                        }
+                        return;
+                    }
+
+                    if (e.key === 'ArrowDown') {
+                        e.preventDefault();
+                        activeIndex = (activeIndex + 1) % itemsList.length;
+                        window.updateHighlightMusica();
+                    } else if (e.key === 'ArrowUp') {
+                        e.preventDefault();
+                        activeIndex = (activeIndex - 1 + itemsList.length) % itemsList.length;
+                        window.updateHighlightMusica();
+                    } else if (e.key === 'Enter') {
+                        e.preventDefault();
+                        if (activeIndex >= 0 && activeIndex < itemsList.length) {
+                            window.selecionarItem(activeIndex);
+                        } else {
+                            window.buscarYT(tipo);
+                        }
+                    }
+                };
+
+                window.updateHighlightMusica = function() {
+                    const resultsDiv = document.getElementById('ytResults');
+                    if (!resultsDiv) return;
+                    const children = resultsDiv.querySelectorAll('.yt-result-item');
+                    children.forEach((child, idx) => {
+                        if (idx === activeIndex) {
+                            child.classList.add('active-item');
+                            child.scrollIntoView({ block: 'nearest' });
+                        } else {
+                            child.classList.remove('active-item');
+                        }
+                    });
+                };
+
+                window.setHighlightMusica = function(idx) {
+                    activeIndex = idx;
+                    window.updateHighlightMusica();
+                };
+
+                window.buscarYT = function(tipo) {
+                    const queryInput = document.getElementById('ytQuery');
+                    if (!queryInput) return;
+                    const query = queryInput.value.trim();
+                    const resultsDiv = document.getElementById('ytResults');
+                    const spinner = document.getElementById('ytSpinner');
+
+                    if (!query) {
+                        if (resultsDiv) resultsDiv.innerHTML = '';
+                        activeIndex = -1;
+                        return;
+                    }
+
+                    if (spinner) spinner.classList.remove('d-none');
+                    if (resultsDiv) resultsDiv.innerHTML = '';
+                    activeIndex = -1;
+
+                    fetch('/api/youtube/search?q=' + encodeURIComponent(query) + '&tipo=' + tipo)
+                        .then(r => r.json())
+                        .then(data => {
+                            if (spinner) spinner.classList.add('d-none');
+                            itemsList = data || [];
+                            activeIndex = -1;
+                            if (!resultsDiv) return;
+                            if (itemsList.length === 0) {
+                                resultsDiv.innerHTML = '<div class="text-secondary small p-3 bg-dark rounded border border-secondary border-opacity-20 text-center">Nenhum resultado encontrado.</div>';
+                                return;
+                            }
+                            resultsDiv.innerHTML = itemsList.map((item, idx) => `
+                                <div class="d-flex align-items-center justify-content-between p-2.5 rounded bg-dark border border-secondary border-opacity-25 cursor-pointer yt-result-item" data-index="${idx}" onclick="window.selecionarItem(${idx})" onmouseenter="window.setHighlightMusica(${idx})">
+                                    <div class="d-flex align-items-center gap-3 overflow-hidden">
+                                        <img src="${item.capaUrl || '/public/img/default-cover.png'}" class="rounded-3 shadow-sm" style="width: 50px; height: 50px; min-width: 50px; object-fit: cover;">
+                                        <div class="overflow-hidden">
+                                            <div class="fw-bold text-white small text-truncate">${escapeHtml(item.titulo)}</div>
+                                            <div class="text-secondary extra-small text-truncate">${escapeHtml(item.artistaOuCanal)}</div>
+                                        </div>
+                                    </div>
+                                    <button type="button" class="btn btn-sm btn-outline-purple rounded-pill px-3 ms-2">Selecionar</button>
+                                </div>
+                            `).join('');
+                        })
+                        .catch(() => {
+                            if (spinner) spinner.classList.add('d-none');
+                            if (resultsDiv) resultsDiv.innerHTML = '<div class="text-danger small p-3 text-center">Erro ao realizar a busca.</div>';
+                        });
+                };
+
+                function escapeHtml(text) {
+                    return (text || '').replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+                }
+
+                window.selecionarItem = function(idx) {
+                    const item = itemsList[idx];
+                    if (!item) return;
+
+                    document.getElementById('titulo').value = item.titulo;
+                    document.getElementById('artista').value = item.artistaOuCanal;
+                    if (document.getElementById('duracaoSegundos')) document.getElementById('duracaoSegundos').value = item.duracaoSegundos || '';
+                    if (document.getElementById('youtubeUrl')) document.getElementById('youtubeUrl').value = item.youtubeUrl || '';
+                    if (document.getElementById('youtubeId')) document.getElementById('youtubeId').value = item.youtubeId || '';
+                    if (document.getElementById('capaUrl')) document.getElementById('capaUrl').value = item.capaUrl || '';
+
+                    // Exibir Preview
+                    const previewCard = document.getElementById('mediaPreview');
+                    if (previewCard) {
+                        previewCard.classList.remove('d-none');
+                        document.getElementById('previewCapa').src = item.capaUrl || '/public/img/default-cover.png';
+                        document.getElementById('previewTitulo').textContent = item.titulo;
+                        document.getElementById('previewArtista').textContent = item.artistaOuCanal;
+                    }
+
+                    // Atualiza o campo de busca
+                    document.getElementById('ytQuery').value = item.titulo + " - " + item.artistaOuCanal;
+
+                    // Limpa resultados
+                    document.getElementById('ytResults').innerHTML = '';
+                    activeIndex = -1;
+                };
+
+                window.handleFormMusicaSubmit = function(e, form) {
+                    const playlistSelect = document.getElementById('playlistId');
+                    const playlistId = playlistSelect ? playlistSelect.value : '';
+                    const videoId = document.getElementById('youtubeId') ? document.getElementById('youtubeId').value : '';
+                    const youtubeUrl = document.getElementById('youtubeUrl') ? document.getElementById('youtubeUrl').value : '';
+
+                    if (playlistId && playlistId !== '' && playlistId !== 'NEW_TEMP' && typeof window.checarESubmeterPlaylist === 'function') {
+                        window.checarESubmeterPlaylist(form, playlistId, videoId, youtubeUrl);
+                        return false;
+                    }
+                    return true;
+                };
+
+
+
+                // Inicialização de estrelas interativas
+                const starContainers = document.querySelectorAll('.interactive-stars');
+                starContainers.forEach(container => {
+                    const inputId = container.getAttribute('data-input');
+                    const input = document.getElementById(inputId);
+                    const initial = parseFloat(container.getAttribute('data-initial')) || 0;
+                    const stars = container.querySelectorAll('.star-btn');
+
+                    function renderStars(val) {
+                        stars.forEach((star, i) => {
+                            if (i + 1 <= val) {
+                                star.classList.remove('bi-star');
+                                star.classList.add('bi-star-fill');
+                            } else {
+                                star.classList.remove('bi-star-fill');
+                                star.classList.add('bi-star');
+                            }
+                        });
+                    }
+
+                    renderStars(initial);
+                    stars.forEach(star => {
+                        star.addEventListener('mouseenter', function() {
+                            const val = parseInt(this.getAttribute('data-index'));
+                            renderStars(val);
+                        });
+                        star.addEventListener('click', function() {
+                            const val = parseInt(this.getAttribute('data-index'));
+                            input.value = val;
+                            container.setAttribute('data-initial', val);
+                            renderStars(val);
+                        });
+                    });
+                    container.addEventListener('mouseleave', function() {
+                        renderStars(parseFloat(container.getAttribute('data-initial')) || 0);
+                    });
+                });
+            })();
+        </script>
+    </main>
+
+</div>
+
+<div th:insert="~{fragments/player :: bottom-player}"></div>
+</body>
+</html>

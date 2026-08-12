@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="pt-BR" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Post - Lynotes</title>
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+    <link rel="alternate icon" type="image/x-icon" href="/favicon.ico">
+    <!-- Fonte Plus Jakarta Sans -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+    <link href="/css/index.css" rel="stylesheet">
+    <link href="/css/player.css" rel="stylesheet">
+    <script src="https://unpkg.com/htmx.org@1.9.11"></script>
+</head>
+<body hx-boost="true" hx-select="#app-content" hx-target="#app-content" class="library-bg text-white">
+<div id="app-content">
+
+    <div th:insert="~{fragments/navbar :: navbar('comunidade')}"></div>
+
+    <main class="spotify-main container py-5">
+        
+        <div class="row justify-content-center">
+            <div class="col-lg-8">
+                <div class="mb-4">
+                    <a href="/comunidade" class="btn btn-outline-secondary rounded-pill px-4">&larr; Voltar para a Comunidade</a>
+                </div>
+                
+                <div class="alert alert-danger rounded-4 mb-4" th:if="${erro}" th:text="${erro}"></div>
+                
+                <!-- Post Principal -->
+                <div class="music-card-cyber p-4 p-md-5 mb-4">
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <div class="d-flex align-items-center">
+                            <div class="rounded-circle bg-purple text-white fw-bold d-flex align-items-center justify-content-center me-3 shadow" style="width: 48px; height: 48px;" th:text="${#strings.substring(post.usuarioNome, 0, 1).toUpperCase()}">U</div>
+                            <div>
+                                <a th:href="@{'/usuarios/' + ${post.usuarioId}}" class="text-decoration-none fw-bold text-white fs-4 hover-purple" th:text="${post.usuarioNome}"></a>
+                                <div class="text-secondary small" th:text="${#temporals.format(post.dataCriacao, 'dd/MM/yyyy HH:mm')}"></div>
+                            </div>
+                        </div>
+                        <div class="d-flex gap-1" th:if="${usuarioLogadoId == post.usuarioId}">
+                            <form th:action="@{'/comunidade/post/' + ${post.id} + '/excluir'}" method="post" onsubmit="return confirmarExclusaoCustom(this, 'Excluir Post?', 'Tem certeza que deseja excluir esta publicação?');">
+                                <button type="submit" class="btn btn-outline-danger btn-sm border-0" title="Excluir post">
+                                    <i class="bi bi-trash"></i>
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+                    
+                    <p class="card-text mb-4 text-light text-break" style="white-space: pre-wrap; font-size: 1.1rem;" th:text="${post.conteudo}"></p>
+
+                    <!-- Estrelas e Comentários Counter -->
+                    <div class="d-flex align-items-center gap-3 pt-3 border-top border-secondary border-opacity-10">
+                        <form th:action="@{'/comunidade/post/' + ${post.id} + '/estrela'}" method="post" class="m-0">
+                            <button type="submit" class="btn btn-sm rounded-pill px-3 d-flex align-items-center gap-1 btn-outline-purple" th:classappend="${post.estreladoPorMim} ? 'bg-purple text-white fw-bold' : ''">
+                                <i class="bi" th:classappend="${post.estreladoPorMim} ? 'bi-hand-thumbs-up-fill' : 'bi-hand-thumbs-up'"></i>
+                                <span th:text="${post.qtdEstrelas}"></span>
+                            </button>
+                        </form>
+                        <span class="btn btn-sm btn-outline-secondary rounded-pill px-3 d-flex align-items-center gap-2 disabled">
+                            <i class="bi bi-chat-text"></i>
+                            <span th:text="${post.qtdComentarios}"></span> Comentários
+                        </span>
+                    </div>
+                </div>
+                
+                <!-- Caixa para Escrever Comentário -->
+                <div class="music-card-cyber p-4 mb-4">
+                    <h5 class="fw-bold text-white mb-3 d-flex align-items-center gap-2">
+                        <i class="bi bi-chat-dots text-purple"></i> Deixe seu comentário
+                    </h5>
+                    <form th:action="@{'/comunidade/post/' + ${post.id} + '/comentar'}" method="post">
+                        <div class="mb-3">
+                            <textarea class="form-control glass-search-input bg-dark text-white border-secondary p-3" name="conteudo" rows="2" placeholder="Escreva seu comentário aqui..." required maxlength="500"></textarea>
+                        </div>
+                        <div class="d-flex justify-content-end">
+                            <button type="submit" class="btn-add-music-glow px-4 py-2">
+                                <i class="bi bi-send-fill me-1"></i> Comentar
+                            </button>
+                        </div>
+                    </form>
+                </div>
+                
+                <!-- Lista de Comentários -->
+                <h5 class="fw-bold text-white mb-3">Comentários</h5>
+                
+                <div th:if="${comentarios.isEmpty()}" class="alert alert-dark border-purple text-secondary text-center p-4 rounded-4">
+                    Seja o primeiro a comentar neste post!
+                </div>
+                
+                <div class="music-card-cyber p-4 mb-3" th:each="comentario : ${comentarios}">
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <div class="d-flex align-items-center gap-2">
+                            <div class="rounded-circle bg-darker text-purple border border-purple d-flex align-items-center justify-content-center font-monospace" style="width: 36px; height: 36px;" th:text="${#strings.substring(comentario.usuarioNome, 0, 1).toUpperCase()}">U</div>
+                            <div>
+                                <a th:href="@{'/usuarios/' + ${comentario.usuarioId}}" class="text-decoration-none fw-bold text-white hover-purple" th:text="${comentario.usuarioNome}"></a>
+                                <div class="text-secondary small" th:text="${#temporals.format(comentario.dataCriacao, 'dd/MM/yyyy HH:mm')}"></div>
+                            </div>
+                        </div>
+                        <div th:if="${usuarioLogadoId == comentario.usuarioId}">
+                            <form th:action="@{'/comunidade/comentario/' + ${comentario.id} + '/excluir'}" method="post" onsubmit="return confirmarExclusaoCustom(this, 'Excluir Comentário?', 'Tem certeza que deseja excluir este comentário?');" class="m-0">
+                                <input type="hidden" name="postId" th:value="${post.id}" />
+                                <button type="submit" class="btn btn-sm btn-outline-danger border-0" title="Excluir comentário">
+                                    <i class="bi bi-trash"></i>
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+                    <p class="card-text text-light text-break mb-0" th:text="${comentario.conteudo}"></p>
+                </div>
+                
+            </div>
+        </div>
+        
+    </main>
+
+</div>
+
+<div th:insert="~{fragments/player :: bottom-player}"></div>
+</body>
+</html>
