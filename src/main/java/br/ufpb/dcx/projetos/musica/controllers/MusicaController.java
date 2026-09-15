@@ -58,10 +58,40 @@ public final class MusicaController {
         String usuarioLogado = ctx.sessionAttribute("usuarioLogado");
         if (usuarioLogado != null) {
             String usuarioId = ctx.sessionAttribute("usuarioLogadoId");
-            List<Musica> musicas = service.findByUsuarioId(usuarioId);
-            List<Artista> artistas = artistaService.listar(null, usuarioId);
-            List<Album> albums = albumService.findAll(usuarioId);
-            List<br.ufpb.dcx.projetos.playlist.models.Playlist> playlists = playlistService.findByUsuarioId(usuarioId);
+            if (usuarioId == null || usuarioId.isBlank()) {
+                ctx.req().getSession().invalidate();
+                ctx.redirect("/login");
+                return;
+            }
+            List<Musica> musicas = List.of();
+            List<Artista> artistas = List.of();
+            List<Album> albums = List.of();
+            List<br.ufpb.dcx.projetos.playlist.models.Playlist> playlists = List.of();
+            Map<String, List<String>> playlistCovers = new HashMap<>();
+
+            try {
+                musicas = service.findByUsuarioId(usuarioId);
+            } catch (Exception e) {
+                LOGGER.warn("Aviso ao buscar músicas do usuário: {}", e.getMessage());
+            }
+
+            try {
+                if (artistaService != null) artistas = artistaService.listar(null, usuarioId);
+            } catch (Exception e) {
+                LOGGER.warn("Aviso ao buscar artistas do usuário: {}", e.getMessage());
+            }
+
+            try {
+                if (albumService != null) albums = albumService.findAll(usuarioId);
+            } catch (Exception e) {
+                LOGGER.warn("Aviso ao buscar álbuns do usuário: {}", e.getMessage());
+            }
+
+            try {
+                if (playlistService != null) playlists = playlistService.findByUsuarioId(usuarioId);
+            } catch (Exception e) {
+                LOGGER.warn("Aviso ao buscar playlists do usuário: {}", e.getMessage());
+            }
 
             Map<String, String> musicCovers = new HashMap<>();
             for (Musica m : musicas) {
@@ -70,7 +100,6 @@ public final class MusicaController {
                 }
             }
 
-            Map<String, List<String>> playlistCovers = new HashMap<>();
             for (br.ufpb.dcx.projetos.playlist.models.Playlist pl : playlists) {
                 List<String> covers = java.util.Collections.emptyList();
                 try {

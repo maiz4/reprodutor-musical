@@ -43,10 +43,19 @@ public class LoginController {
         if (service.verificarCredenciais(identificador, senha)) {
             br.ufpb.dcx.projetos.login.models.Usuario usuario = service.buscarPorEmail(identificador)
                     .or(() -> service.buscarPorUsername(identificador))
-                    .orElseThrow();
+                    .orElse(null);
+
+            if (usuario == null) {
+                ctx.status(401).render("login", Map.of(
+                        "erro", "Usuário não encontrado.",
+                        "usuarioInformado", Objects.toString(identificador, "")
+                ));
+                return;
+            }
+
             ctx.sessionAttribute(ATRIBUTO_USUARIO_SESSAO, usuario.getNome());
             ctx.sessionAttribute("usuarioLogadoId", usuario.getId());
-            ctx.sessionAttribute("usuarioLogadoTipo", usuario.getTipo());
+            ctx.sessionAttribute("usuarioLogadoTipo", usuario.getTipo() != null ? usuario.getTipo() : "COMUM");
             ctx.redirect("/");
             return;
         }
