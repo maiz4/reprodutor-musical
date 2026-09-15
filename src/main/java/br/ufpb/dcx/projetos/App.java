@@ -93,11 +93,13 @@ public final class App {
 
         var connectionFactory = criarConnectionFactory();
         
-        // Garante que o esquema do banco (incluindo colunas e tabelas) esteja atualizado
+        // Garante que o esquema do banco (incluindo todas as colunas e tabelas) esteja atualizado
         try {
+            br.ufpb.dcx.projetos.artista.repositories.ArtistaSchemaInitializer.inicializar(connectionFactory);
             br.ufpb.dcx.projetos.album.repositories.AlbumSchemaInitializer.inicializar(connectionFactory);
+            inicializarTabelasComunidade(connectionFactory);
         } catch (Exception e) {
-            LOGGER.warn("Aviso ao inicializar esquema do álbum: {}", e.getMessage());
+            LOGGER.warn("Aviso ao inicializar esquemas do banco: {}", e.getMessage());
         }
 
         var comunidadeRepo = new br.ufpb.dcx.projetos.comunidade.repositories.ComunidadeDbRepository(connectionFactory);
@@ -287,5 +289,87 @@ public final class App {
         TemplateEngine engine = new TemplateEngine();
         engine.setTemplateResolver(resolver);
         return engine;
+    }
+
+    private static void inicializarTabelasComunidade(ConnectionFactory connectionFactory) {
+        String sql = """
+            CREATE TABLE IF NOT EXISTS post (
+                id VARCHAR(36) PRIMARY KEY,
+                usuario_id VARCHAR(36) NOT NULL,
+                conteudo TEXT NOT NULL,
+                data_criacao TIMESTAMP WITH TIME ZONE NOT NULL,
+                tipo VARCHAR(50) DEFAULT 'GERAL',
+                musica_id VARCHAR(36),
+                album_id VARCHAR(36),
+                artista_id VARCHAR(36),
+                CONSTRAINT fk_post_usuario FOREIGN KEY (usuario_id) REFERENCES usuario(id) ON DELETE CASCADE
+            );
+
+            CREATE TABLE IF NOT EXISTS curtida (
+                id VARCHAR(36) PRIMARY KEY,
+                post_id VARCHAR(36) NOT NULL,
+                usuario_id VARCHAR(36) NOT NULL,
+                data_criacao TIMESTAMP WITH TIME ZONE NOT NULL,
+                CONSTRAINT fk_curtida_post FOREIGN KEY (post_id) REFERENCES post(id) ON DELETE CASCADE,
+                CONSTRAINT fk_curtida_usuario FOREIGN KEY (usuario_id) REFERENCES usuario(id) ON DELETE CASCADE,
+                CONSTRAINT unq_curtida_post_usuario UNIQUE (post_id, usuario_id)
+            );
+
+            CREATE TABLE IF NOT EXISTS comentario (
+                id VARCHAR(36) PRIMARY KEY,
+                post_id VARCHAR(36) NOT NULL,
+                usuario_id VARCHAR(36) NOT NULL,
+                conteudo TEXT NOT NULL,
+                data_criacao TIMESTAMP WITH TIME ZONE NOT NULL,
+                CONSTRAINT fk_comentario_post FOREIGN KEY (post_id) REFERENCES post(id) ON DELETE CASCADE,
+                CONSTRAINT fk_comentario_usuario FOREIGN KEY (usuario_id) REFERENCES usuario(id) ON DELETE CASCADE
+            );
+
+            CREATE TABLE IF NOT EXISTS seguidor (
+                id VARCHAR(36) PRIMARY KEY,
+                seguidor_id VARCHAR(36) NOT NULL,
+                seguido_id VARCHAR(36) NOT NULL,
+                data_criacao TIMESTAMP WITH TIME ZONE NOT NULL,
+                CONSTRAINT fk_seguidor_usuario FOREIGN KEY (seguidor_id) REFERENCES usuario(id) ON DELETE CASCADE,
+                CONSTRAINT fk_seguido_usuario FOREIGN KEY (seguido_id) REFERENCES usuario(id) ON DELETE CASCADE,
+                CONSTRAINT unq_seguidor_seguido UNIQUE (seguidor_id, seguido_id)
+            );
+
+            CREATE TABLE IF NOT EXISTS pedido_seguir (
+                id VARCHAR(36) PRIMARY KEY,
+                solicitante_id VARCHAR(36) NOT NULL,
+                destinatario_id VARCHAR(36) NOT NULL,
+                criado_em TIMESTAMP WITH TIME ZONE NOT NULL,
+                CONSTRAINT fk_pedido_solicitante FOREIGN KEY (solicitante_id) REFERENCES usuario(id) ON DELETE CASCADE,
+                CONSTRAINT fk_pedido_destinatario FOREIGN KEY (destinatario_id) REFERENCES usuario(id) ON DELETE CASCADE,
+                CONSTRAINT unq_pedido_solicitante_destinatario UNIQUE (solicitante_id, destinatario_id)
+            );
+
+            CREATE TABLE IF NOT EXISTS recuperacao_senha (
+                email VARCHAR(100) PRIMARY KEY,
+                codigo VARCHAR(10) NOT NULL,
+                expiracao TIMESTAMP NOT NULL
+            );
+
+            CREATE TABLE IF NOT EXISTS notificacao (
+                id VARCHAR(36) PRIMARY KEY,
+                usuario_id VARCHAR(36) NOT NULL,
+                remetente_id VARCHAR(36) NOT NULL,
+                tipo VARCHAR(50) NOT NULL,
+                mensagem TEXT NOT NULL,
+                lida BOOLEAN DEFAULT FALSE,
+                criado_em TIMESTAMP WITH TIME ZONE NOT NULL,
+                target_id VARCHAR(36),
+                CONSTRAINT fk_notificacao_usuario FOREIGN KEY (usuario_id) REFERENCES usuario(id) ON DELETE CASCADE,
+                CONSTRAINT fk_notificacao_remetente FOREIGN KEY (remetente_id) REFERENCES usuario(id) ON DELETE CASCADE
+            );
+            """;
+        try (java.sql.Connection conn = connectionFactory.abrir();
+             java.sql.Statement stmt = conn.createStatement()) {
+            stmt.execute(sql);
+            LOGGER.info("Tabelas da comunidade e notificações inicializadas com sucesso.");
+        } catch (Exception e) {
+            LOGGER.warn("Aviso ao inicializar tabelas da comunidade: {}", e.getMessage());
+        }
     }
 }
