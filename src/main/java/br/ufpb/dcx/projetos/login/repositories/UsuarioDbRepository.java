@@ -23,7 +23,7 @@ public class UsuarioDbRepository implements UsuarioRepository {
         this.url = url;
         this.usuarioDb = usuarioDb;
         this.senhaDb = senhaDb;
-        // inicializarTabela(); // Movido para Flyway
+        inicializarTabela();
     }
 
     // Método privado para abrir conexão com o banco de dados
@@ -32,30 +32,37 @@ public class UsuarioDbRepository implements UsuarioRepository {
     }
 
     // Executa a criação da tabela se ela ainda não existir no PostgreSQL
-    private void inicializarTabela() {
+    public void inicializarTabela() {
         String sql = "CREATE TABLE IF NOT EXISTS usuario (" +
                      "id VARCHAR(36) PRIMARY KEY, " +
                      "nome VARCHAR(100) NOT NULL, " +
+                     "username VARCHAR(100), " +
                      "email VARCHAR(100) UNIQUE NOT NULL, " +
                      "senha VARCHAR(100) NOT NULL, " +
-                     "tipo VARCHAR(20) DEFAULT 'COMUM'" +
+                     "tipo VARCHAR(20) DEFAULT 'COMUM', " +
+                     "bio TEXT, " +
+                     "foto_url VARCHAR(500)" +
                      ");";
         try (Connection conn = obterConexao();
              Statement stmt = conn.createStatement()) {
             stmt.execute(sql);
-            try { stmt.execute("ALTER TABLE usuario ADD COLUMN tipo VARCHAR(20) DEFAULT 'COMUM';"); } catch (SQLException e) { /* ignored */ }
+            try { stmt.execute("ALTER TABLE usuario ADD COLUMN IF NOT EXISTS username VARCHAR(100);"); } catch (SQLException e) { /* ignored */ }
+            try { stmt.execute("ALTER TABLE usuario ADD COLUMN IF NOT EXISTS tipo VARCHAR(20) DEFAULT 'COMUM';"); } catch (SQLException e) { /* ignored */ }
+            try { stmt.execute("ALTER TABLE usuario ADD COLUMN IF NOT EXISTS bio TEXT;"); } catch (SQLException e) { /* ignored */ }
+            try { stmt.execute("ALTER TABLE usuario ADD COLUMN IF NOT EXISTS foto_url VARCHAR(500);"); } catch (SQLException e) { /* ignored */ }
 
             // Seed automático se a tabela estiver vazia
             String countSql = "SELECT COUNT(*) FROM usuario;";
             try (ResultSet rs = stmt.executeQuery(countSql)) {
                 if (rs.next() && rs.getInt(1) == 0) {
-                    String insertSql = "INSERT INTO usuario (id, nome, email, senha, tipo) VALUES (?, ?, ?, ?, ?);";
+                    String insertSql = "INSERT INTO usuario (id, nome, username, email, senha, tipo) VALUES (?, ?, ?, ?, ?, ?);";
                     try (PreparedStatement ps = conn.prepareStatement(insertSql)) {
                         ps.setString(1, "c4b4d693-e18e-4f51-b844-3d9692482be2");
                         ps.setString(2, "Administrador");
-                        ps.setString(3, "admin@email.com");
-                        ps.setString(4, "$2a$10$uNMxjjZPaBHQm.LCdShe7ujv3tAyy8Fn9px0u6XEUyfFW1/LjWPSa"); // admin123
-                        ps.setString(5, "ADMIN");
+                        ps.setString(3, "admin");
+                        ps.setString(4, "admin@email.com");
+                        ps.setString(5, "$2a$10$uNMxjjZPaBHQm.LCdShe7ujv3tAyy8Fn9px0u6XEUyfFW1/LjWPSa"); // admin123
+                        ps.setString(6, "ADMIN");
                         ps.executeUpdate();
                         System.out.println("Usuário administrador padrão criado automaticamente: admin@email.com / admin123");
                     }
