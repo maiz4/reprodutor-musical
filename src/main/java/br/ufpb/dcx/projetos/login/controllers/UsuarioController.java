@@ -112,7 +112,7 @@ public final class UsuarioController {
                 ctx.sessionAttribute("usuarioLogadoTipo", usuario.getTipo());
                 ctx.redirect("/");
             }
-        } catch (IllegalArgumentException e) {
+        } catch (Exception e) {
             Map<String, Object> modelo = new HashMap<>();
             modelo.put("usuarioLogado", ctx.sessionAttribute("usuarioLogado"));
             modelo.put("edicao", false);
@@ -122,7 +122,15 @@ public final class UsuarioController {
             modelo.put("email", dto.email());
             modelo.put("bio", dto.bio());
             modelo.put("fotoUrl", dto.fotoUrl());
-            modelo.put("erro", e.getMessage());
+            String msg = e.getMessage();
+            if (msg != null && msg.contains("Erro ao salvar usuário no banco")) {
+                if (msg.contains("usuario_email_key") || msg.contains("email")) {
+                    msg = "Já existe um usuário cadastrado com este e-mail.";
+                } else if (msg.contains("usuario_username_key") || msg.contains("username")) {
+                    msg = "Já existe um usuário cadastrado com este username.";
+                }
+            }
+            modelo.put("erro", msg != null ? msg : "Erro ao cadastrar usuário.");
             ctx.status(HttpStatus.OK).render("usuarios/formulario", modelo);
         }
     }
